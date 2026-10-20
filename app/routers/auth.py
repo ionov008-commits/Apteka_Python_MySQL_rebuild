@@ -76,31 +76,41 @@ def register_submit(
     pharmacy_id: Optional[int] = Form(None),
     pharmacy_name: Optional[str] = Form(None),
     pharmacy_address: Optional[str] = Form(None),
-    pharmacy_phone: Optional[str] = Form(None),
     pharmacy_working_hours: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     pharmacies = db.query(models.Pharmacy).all()
 
-    existing = db.query(models.User).filter((models.User.Username == username) | (models.User.Email == email)).first()
-    if existing:
+    # 1. Проверка логина
+    existing_user = db.query(models.User).filter(models.User.Username == username).first()
+    if existing_user:
         return templates.TemplateResponse(
             request=request, name='account/register.html',
-            context={'error': 'Пользователь с таким логином или Email уже существует', 'pharmacies': pharmacies, 'title': 'Регистрация'},
+            context={'error': f'Логин "{username}" уже занят. Выберите другой.', 'pharmacies': pharmacies, 'title': 'Регистрация'},
             status_code=400
         )
 
+    # 2. Проверка Email
+    existing_email = db.query(models.User).filter(models.User.Email == email).first()
+    if existing_email:
+        return templates.TemplateResponse(
+            request=request, name='account/register.html',
+            context={'error': f'Email "{email}" уже зарегистрирован в системе.', 'pharmacies': pharmacies, 'title': 'Регистрация'},
+            status_code=400
+        )
+
+    # 3. Валидация специфичных полей ролей
     if role == 'pharmacist' and not pharmacy_id:
         return templates.TemplateResponse(
             request=request, name='account/register.html',
-            context={'error': 'Выберите аптеку для работы фармацевта', 'pharmacies': pharmacies, 'title': 'Регистрация'},
+            context={'error': 'Выберите аптеку для работы фармацевта.', 'pharmacies': pharmacies, 'title': 'Регистрация'},
             status_code=400
         )
 
     if role == 'owner' and not pharmacy_name:
         return templates.TemplateResponse(
             request=request, name='account/register.html',
-            context={'error': 'Укажите название и данные регистрируемой аптеки', 'pharmacies': pharmacies, 'title': 'Регистрация'},
+            context={'error': 'Укажите название регистрируемой аптеки.', 'pharmacies': pharmacies, 'title': 'Регистрация'},
             status_code=400
         )
 
@@ -119,9 +129,9 @@ def register_submit(
             user_id=new_user.user_id,
             full_name=full_name,
             phone=phone,
-            default_address=address,
-            latitude=latitude,
-            longitude=longitude
+            default_address=address or "Адрес не указан",
+            latitude=latitude or 53.90,
+            longitude=longitude or 27.56
         )
         db.add(customer)
 
@@ -139,11 +149,11 @@ def register_submit(
             user_id=new_user.user_id,
             name=pharmacy_name,
             address=pharmacy_address or address or "Адрес не указан",
-            phone=pharmacy_phone or phone,
-            director_name=full_name,
+            phone=phone,  # Используется единое поле телефона
+            director_name=full_name,  # ФИО владельца/директора
             working_hours=pharmacy_working_hours or "08:00-22:00 ежедневно",
-            latitude=latitude,
-            longitude=longitude
+            latitude=latitude or 53.90,
+            longitude=longitude or 27.56
         )
         db.add(pharmacy)
 

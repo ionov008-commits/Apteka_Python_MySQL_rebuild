@@ -1,13 +1,91 @@
 {% extends "shared/_layout.html" %}
-
 {% block content %}
-<div class="p-5 mb-4 bg-white rounded-3 shadow-sm border text-center">
-    <div class="container-fluid py-3">
-        <h1 class="display-5 fw-bold text-primary">Добро пожаловать в Агрегатор Аптек</h1>
-        <p class="col-md-8 fs-4 mx-auto text-muted">
-            Ищите необходимые лекарства, сравнивайте цены в ближайших аптеках и бронируйте товары онлайн.
-        </p>
-        <a class="btn btn-primary btn-lg mt-3 fw-bold px-4" href="/catalog">Перейти в каталог →</a>
+<!-- Главный баннер с быстрым поиском -->
+<div class="p-5 mb-4 bg-primary text-white rounded-3 shadow-sm">
+    <div class="container-fluid py-4 text-center">
+        <h1 class="display-5 fw-bold mb-3">Единый поиск лекарств в аптеках</h1>
+        <p class="col-md-8 fs-5 mx-auto mb-4">Сравнивайте цены, проверяйте наличие в ближайших аптеках и бронируйте препараты в пару кликов.</p>
+
+        <form method="get" action="/catalog" class="col-md-8 mx-auto">
+            <div class="input-group input-group-lg shadow">
+                <input type="text" name="q" class="form-control" placeholder="Введите название лекарства или действующее вещество..." aria-label="Поиск">
+                <button class="btn btn-warning fw-bold px-4 text-dark" type="submit">Найти в аптеках</button>
+            </div>
+        </form>
+
+        <!-- Быстрые теги фильтрации -->
+        <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
+            <span class="small opacity-75 me-2">Часто ищут:</span>
+            <a href="/catalog?q=Парацетамол" class="badge bg-white text-primary text-decoration-none">Парацетамол</a>
+            <a href="/catalog?q=Амоксициллин" class="badge bg-white text-primary text-decoration-none">Амоксициллин</a>
+            <a href="/catalog?q=Ибупрофен" class="badge bg-white text-primary text-decoration-none">Ибупрофен</a>
+            <a href="/catalog?form=таблетки" class="badge bg-white text-primary text-decoration-none">Таблетки</a>
+        </div>
+    </div>
+</div>
+
+<!-- Преимущества системы -->
+<div class="row g-4 mb-5 text-center">
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm p-4">
+            <div class="fs-1 text-primary mb-2">📍</div>
+            <h5 class="fw-bold">Геолокация и карты</h5>
+            <p class="text-muted small mb-0">Система автоматически находит ближайшие к вам аптеки и рассчитывает расстояние в километрах.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm p-4">
+            <div class="fs-1 text-success mb-2">📲</div>
+            <h5 class="fw-bold">Бронь по QR-коду</h5>
+            <p class="text-muted small mb-0">Оформите заказ онлайн и покажите QR-код фармацевту в аптеке для мгновенного получения.</p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm p-4">
+            <div class="fs-1 text-warning mb-2">⚖️</div>
+            <h5 class="fw-bold">Прозрачность цен</h5>
+            <p class="text-muted small mb-0">Сравнивайте стоимость препаратов в разных аптечных сетях города без переплат.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Популярные товары -->
+{% if popular_products %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold mb-0">Популярные препараты</h3>
+    <a href="/catalog" class="btn btn-outline-primary fw-bold btn-sm">Смотреть весь каталог &rarr;</a>
+</div>
+
+<div class="row row-cols-1 row-cols-md-3 g-4 mb-5">
+    {% for p in popular_products %}
+    <div class="col">
+        <div class="card h-100 shadow-sm border-0">
+            <img src="/static/images/products/{{ p.display_image }}" class="card-img-top p-3" style="height: 180px; object-fit: contain;">
+            <div class="card-body d-flex flex-column">
+                <h5 class="card-title fw-bold text-primary">{{ p.name }}</h5>
+                <p class="card-text text-muted small mb-2">{{ p.active_substance or '' }}</p>
+                <div class="mt-auto">
+                    <span class="badge bg-light text-dark border mb-3">{{ p.form or '' }} {{ p.dosage or '' }}</span>
+                    <a href="/product/{{ p.product_id }}" class="btn btn-primary w-100 fw-bold">Где купить &rarr;</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Статистика агрегатора -->
+<div class="card border-0 bg-dark text-white shadow-sm p-4 mb-4 text-center">
+    <div class="row">
+        <div class="col-md-6 border-end border-secondary">
+            <h2 class="display-6 fw-bold text-primary mb-0">{{ pharmacies_count }}</h2>
+            <p class="text-white-50 mb-0">Подключенных аптек</p>
+        </div>
+        <div class="col-md-6">
+            <h2 class="display-6 fw-bold text-success mb-0">{{ products_count }}</h2>
+            <p class="text-white-50 mb-0">Наименований в базе</p>
+        </div>
     </div>
 </div>
 {% endblock %}

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 import datetime
 
 from app.db.database import get_db
@@ -18,6 +19,14 @@ def get_current_customer(request: Request, db: Session):
         return None
     return db.query(models.Customer).filter(models.Customer.user_id == int(user_id)).first()
 
+def get_reserved_quantity(stock_id: int, db: Session) -> int:
+    """Возвращает количество забронированного, но еще не выданного товара"""
+    result = db.query(func.sum(models.OrderItem.quantity)).filter(
+        models.OrderItem.stock_id == stock_id,
+        models.OrderItem.status == 'Pending'
+    ).scalar()
+    return int(result or 0)
+
 @router.get('')
 def view_cart(request: Request, db: Session = Depends(get_db)):
     cancel_expired_orders(db)
@@ -33,9 +42,21 @@ def view_cart(request: Request, db: Session = Depends(get_db)):
     items = cart_order.items if cart_order else []
     total_cost = sum(item.quantity * (item.stock.price or 0) for item in items if item.stock)
 
+    # Передаем доступный остаток для ограничения кнопок +
+    items_with_avail = []
+    for item in items:
+        if item.stock:
+            reserved = get_reserved_quantity(item.stock_id, db)
+            # Доступно = Физический остаток - Забронировано другими
+            available = max(0, (item.stock.quantity or 0) - reserved + item.quantity)
+            items_with_avail.append({
+                'item': item,
+                'available': available
+            })
+
     return templates.TemplateResponse(
         request=request, name='cart.html',
-        context={'cart_order': cart_order, 'items': items, 'total_cost': total_cost, 'title': 'Корзина'}
+        context={'cart_order': cart_order, 'items_data': items_with_avail, 'total_cost': total_cost, 'title': 'Корзина'}
     )
 
 @router.post('/add')
@@ -50,7 +71,13 @@ def add_to_cart(
         return RedirectResponse(url='/account/login', status_code=303)
 
     stock = db.query(models.PharmacyStock).filter(models.PharmacyStock.stock_id == stock_id).first()
-    if not stock or stock.quantity < quantity:
+    if not stock:
+        return RedirectResponse(url='/catalog', status_code=303)
+
+    reserved = get_reserved_quantity(stock_id, db)
+    available = max(0, (stock.quantity or 0) - reserved)
+
+    if available < quantity:
         return RedirectResponse(url='/catalog', status_code=303)
 
     cart_order = db.query(models.CustomerOrder).filter(
@@ -70,7 +97,7 @@ def add_to_cart(
     ).first()
 
     if existing_item:
-        if stock.quantity >= existing_item.quantity + quantity:
+        if available >= quantity:
             existing_item.quantity += quantity
     else:
         new_item = models.OrderItem(order_id=cart_order.order_id, stock_id=stock_id, quantity=quantity, status='Pending')
@@ -93,7 +120,9 @@ def update_cart_item(
     item = db.query(models.OrderItem).filter(models.OrderItem.order_item_id == order_item_id).first()
     if item and item.order.customer_id == customer.customer_id and item.order.status == 'cart':
         if action == 'increase':
-            if item.stock and item.stock.quantity > item.quantity:
+            reserved = get_reserved_quantity(item.stock_id, db)
+            available = max(0, (item.stock.quantity or 0) - reserved)
+            if available > 0:
                 item.quantity += 1
         elif action == 'decrease':
             if item.quantity > 1:
@@ -120,9 +149,12 @@ def checkout(request: Request, db: Session = Depends(get_db)):
     if not cart_order or not cart_order.items:
         return RedirectResponse(url='/cart', status_code=303)
 
+    # Проверяем наличие перед перевод в активный заказ (ФИЗИЧЕСКИЙ ОСТАТОК НЕ УМЕНЬШАЕМ!)
     for item in cart_order.items:
-        if item.stock and item.stock.quantity >= item.quantity:
-            item.stock.quantity -= item.quantity
+        reserved = get_reserved_quantity(item.stock_id, db)
+        available = max(0, (item.stock.quantity or 0) - reserved + item.quantity)
+        if item.quantity > available:
+            return RedirectResponse(url='/cart', status_code=303)
 
     cart_order.status = 'active'
     cart_order.created_at = datetime.datetime.utcnow()

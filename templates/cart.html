@@ -2,7 +2,7 @@
 {% block content %}
 <h2 class="mb-4">Ваша корзина</h2>
 
-{% if items %}
+{% if items_data %}
 <div class="row">
     <div class="col-md-8">
         <div class="card shadow-sm border-0 mb-4">
@@ -19,7 +19,8 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for item in items %}
+                        {% for row in items_data %}
+                        {% set item = row.item %}
                         <tr>
                             <td>
                                 <strong>{{ item.stock.product.name }}</strong><br>
@@ -40,7 +41,7 @@
                                     <form method="post" action="/cart/update" class="d-inline">
                                         <input type="hidden" name="order_item_id" value="{{ item.order_item_id }}">
                                         <input type="hidden" name="action" value="increase">
-                                        <button type="submit" class="btn btn-sm btn-outline-secondary px-2 fw-bold" {% if item.quantity >= item.stock.quantity %}disabled{% endif %}>+</button>
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary px-2 fw-bold" {% if item.quantity >= row.available %}disabled{% endif %}>+</button>
                                     </form>
                                 </div>
                             </td>

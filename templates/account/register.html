@@ -6,7 +6,7 @@
             <div class="card-body p-4">
                 <h3 class="card-title text-center mb-4 text-primary fw-bold">Регистрация в системе</h3>
                 {% if error %}
-                <div class="alert alert-danger">{{ error }}</div>
+                <div class="alert alert-danger font-weight-bold">{{ error }}</div>
                 {% endif %}
 
                 <form method="post" action="/account/register">
@@ -32,11 +32,11 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-bold">ФИО</label>
+                            <label class="form-label fw-bold" id="fullNameLabel">ФИО</label>
                             <input type="text" name="full_name" class="form-control" required placeholder="Иванов Иван Иванович">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Телефон</label>
+                            <label class="form-label fw-bold" id="phoneLabel">Телефон</label>
                             <input type="text" name="phone" id="phoneInput" class="form-control" placeholder="+375 (29) 000-00-00" required>
                         </div>
 
@@ -53,11 +53,7 @@
                                     <input type="text" name="pharmacy_name" class="form-control" placeholder="ООО 'Аптека Здоровье'">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Телефон аптеки</label>
-                                    <input type="text" name="pharmacy_phone" class="form-control" placeholder="+375 (17) 200-00-00">
-                                </div>
-                                <div class="col-12">
-                                    <label class="form-label fw-bold">Часы работы</label>
+                                    <label class="form-label fw-bold">Режим работы</label>
                                     <input type="text" name="pharmacy_working_hours" class="form-control" placeholder="08:00-22:00 ежедневно" value="08:00-22:00 ежедневно">
                                 </div>
                                 <div class="col-12">
@@ -100,22 +96,30 @@ function toggleRoleFields() {
     var ownerPharmacyBlock = document.getElementById("ownerPharmacyBlock");
     var pharmacistBlock = document.getElementById("pharmacistBlock");
     var mapSection = document.getElementById("mapSection");
+    var phoneLabel = document.getElementById("phoneLabel");
+    var fullNameLabel = document.getElementById("fullNameLabel");
 
     if (role === "pharmacist") {
         customerAddressBlock.classList.add("d-none");
         ownerPharmacyBlock.classList.add("d-none");
         pharmacistBlock.classList.remove("d-none");
         mapSection.classList.add("d-none");
+        phoneLabel.innerText = "Телефон";
+        fullNameLabel.innerText = "ФИО сотрудника";
     } else if (role === "owner") {
         customerAddressBlock.classList.add("d-none");
         ownerPharmacyBlock.classList.remove("d-none");
         pharmacistBlock.classList.add("d-none");
         mapSection.classList.remove("d-none");
+        phoneLabel.innerText = "Телефон аптеки / контактный";
+        fullNameLabel.innerText = "ФИО руководителя";
     } else {
         customerAddressBlock.classList.remove("d-none");
         ownerPharmacyBlock.classList.add("d-none");
         pharmacistBlock.classList.add("d-none");
         mapSection.classList.remove("d-none");
+        phoneLabel.innerText = "Телефон";
+        fullNameLabel.innerText = "ФИО";
     }
     if (map) setTimeout(() => map.invalidateSize(), 200);
 }

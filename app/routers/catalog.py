@@ -1,117 +1,105 @@
-import math
-from typing import Optional
 from fastapi import APIRouter, Depends, Request, Query
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import func
+from typing import Optional
 
 from app.db.database import get_db
 from app.db import models
-from app.services.order_worker import cancel_expired_orders
 
-router = APIRouter(tags=["Catalog"])
-templates = Jinja2Templates(directory="templates")
+router = APIRouter(tags=['Catalog'])
+templates = Jinja2Templates(directory='templates')
 
+def get_reserved_quantity(stock_id: int, db: Session) -> int:
+    result = db.query(func.sum(models.OrderItem.quantity)).filter(
+        models.OrderItem.stock_id == stock_id,
+        models.OrderItem.status == 'Pending'
+    ).scalar()
+    return int(result or 0)
 
-def haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371.0
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = (math.sin(dlat / 2) ** 2 +
-         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
-         math.sin(dlon / 2) ** 2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return round(R * c, 2)
+@router.get('/')
+def home_page(request: Request, db: Session = Depends(get_db)):
+    popular_products = db.query(models.Product).limit(6).all()
+    pharmacies_count = db.query(models.Pharmacy).count()
+    products_count = db.query(models.Product).count()
 
+    return templates.TemplateResponse(
+        request=request,
+        name='index.html',
+        context={
+            'popular_products': popular_products,
+            'pharmacies_count': pharmacies_count,
+            'products_count': products_count,
+            'title': 'Главная — Поиск лекарств в аптеках'
+        }
+    )
 
-@router.get("/catalog")
+@router.get('/catalog')
 def catalog_page(
     request: Request,
     q: Optional[str] = Query(None),
     form: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
-    cancel_expired_orders(db)
     query = db.query(models.Product)
-
     if q:
-        search_pattern = f"%{q}%"
         query = query.filter(
-            or_(
-                models.Product.name.ilike(search_pattern),
-                models.Product.active_substance.ilike(search_pattern),
-                models.Product.description.ilike(search_pattern)
-            )
+            (models.Product.name.ilike(f'%{q}%')) |
+            (models.Product.active_substance.ilike(f'%{q}%'))
         )
-
-    if form:
+    if form and form != 'all':
         query = query.filter(models.Product.form == form)
 
-    products = query.all()
+    products = query.order_by(models.Product.name).all()
     forms = [f[0] for f in db.query(models.Product.form).distinct().all() if f[0]]
 
     return templates.TemplateResponse(
-        request=request,
-        name="catalog.html",
-        context={
-            "products": products,
-            "search_query": q or "",
-            "selected_form": form or "",
-            "forms": forms,
-            "title": "Каталог лекарств"
-        }
+        request=request, name='catalog.html',
+        context={'products': products, 'forms': forms, 'q': q or '', 'selected_form': form or 'all', 'title': 'Каталог лекарств'}
     )
 
-
-@router.get("/product/{product_id}")
-def product_card(
-    request: Request,
-    product_id: int,
-    user_lat: Optional[float] = Query(None),
-    user_lon: Optional[float] = Query(None),
-    db: Session = Depends(get_db)
-):
-    cancel_expired_orders(db)
+@router.get('/product/{product_id}')
+def product_card(request: Request, product_id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.product_id == product_id).first()
     if not product:
-        return templates.TemplateResponse(
-            request=request,
-            name="error.html",
-            context={"message": "Товар не найден"},
-            status_code=404
-        )
+        return templates.TemplateResponse(request=request, name='404.html', context={'title': 'Товар не найден'}, status_code=404)
 
-    stocks = db.query(models.PharmacyStock).filter(
-        models.PharmacyStock.product_id == product_id,
-        models.PharmacyStock.quantity > 0
-    ).all()
+    raw_stocks = db.query(models.PharmacyStock).filter(models.PharmacyStock.product_id == product_id).all()
 
-    pharmacies_info = []
-    for stock in stocks:
-        pharmacy = stock.pharmacy
-        distance = None
-        if user_lat is not None and user_lon is not None and pharmacy.latitude and pharmacy.longitude:
-            distance = haversine(user_lat, user_lon, pharmacy.latitude, pharmacy.longitude)
+    stocks_data = []
+    for s in raw_stocks:
+        reserved = get_reserved_quantity(s.stock_id, db)
+        available = max(0, (s.quantity or 0) - reserved)
 
-        pharmacies_info.append({
-            "stock_id": stock.stock_id,
-            "pharmacy": pharmacy,
-            "price": stock.price,
-            "quantity": stock.quantity,
-            "distance": distance
-        })
+        if available > 0:
+            stocks_data.append({
+                'stock': s,
+                'available': available
+            })
 
-    if user_lat is not None and user_lon is not None:
-        pharmacies_info.sort(key=lambda x: (x["distance"] if x["distance"] is not None else float("inf")))
+    user_id = request.cookies.get('user_id')
+    user_lat = 53.9045
+    user_lon = 27.5615
+    user_address = "г. Минск (по умолчанию)"
+    has_db_coords = False
+
+    if user_id and str(user_id).isdigit():
+        customer = db.query(models.Customer).filter(models.Customer.user_id == int(user_id)).first()
+        if customer and customer.latitude is not None and customer.longitude is not None:
+            user_lat = float(customer.latitude)
+            user_lon = float(customer.longitude)
+            user_address = customer.default_address or "Адрес из вашего профиля"
+            has_db_coords = True
 
     return templates.TemplateResponse(
-        request=request,
-        name="product_card.html",
+        request=request, name='product_card.html',
         context={
-            "product": product,
-            "pharmacies_info": pharmacies_info,
-            "user_lat": user_lat,
-            "user_lon": user_lon,
-            "title": f"{product.name} - Детали"
+            'product': product,
+            'stocks_data': stocks_data,
+            'user_lat': user_lat,
+            'user_lon': user_lon,
+            'user_address': user_address,
+            'has_db_coords': has_db_coords,
+            'title': product.name
         }
     )

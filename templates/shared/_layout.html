@@ -22,10 +22,11 @@
                     <li class="nav-item"><a class="nav-link" href="/">Главная</a></li>
                     <li class="nav-item"><a class="nav-link" href="/catalog">Каталог</a></li>
                 </ul>
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="/cart">🛒 Корзина</a></li>
-                    {% if request and request.cookies.get('user_id') %}
-                        {% set role = request.cookies.get('user_role') %}
+                <ul class="navbar-nav ms-auto align-items-center">
+                    {% set user_id = request.cookies.get('user_id') if request else None %}
+                    {% set role = request.cookies.get('user_role') if request else None %}
+
+                    {% if user_id %}
                         {% if role == 'owner' %}
                             <li class="nav-item"><a class="nav-link" href="/pharmacy/manager">🏥 Панель аптеки</a></li>
                         {% elif role == 'pharmacist' %}
@@ -33,10 +34,16 @@
                         {% elif role == 'admin' %}
                             <li class="nav-item"><a class="nav-link" href="/admin/dashboard">⚙️ Админка</a></li>
                         {% else %}
+                            {# Покупатель #}
+                            <li class="nav-item"><a class="nav-link" href="/cart">🛒 Корзина</a></li>
                             <li class="nav-item"><a class="nav-link" href="/profile">👤 Личный кабинет</a></li>
                         {% endif %}
-                        <li class="nav-item"><a class="nav-link text-warning fw-bold" href="/account/logout">Выход</a></li>
+                        <li class="nav-item ms-2">
+                            <a class="nav-link text-warning fw-bold" href="/account/logout">Выход</a>
+                        </li>
                     {% else %}
+                        {# Гость #}
+                        <li class="nav-item"><a class="nav-link" href="/cart">🛒 Корзина</a></li>
                         <li class="nav-item"><a class="nav-link" href="/account/login">Вход</a></li>
                         <li class="nav-item"><a class="nav-link" href="/account/register">Регистрация</a></li>
                     {% endif %}

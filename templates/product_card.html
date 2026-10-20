@@ -1,66 +1,220 @@
 {% extends "shared/_layout.html" %}
-
 {% block content %}
-<div class="row bg-white p-4 rounded shadow-sm border mb-4">
-    <div class="col-md-4 text-center">
-        <img src="/static/images/products/{{ product.display_image }}" class="card-img-top p-3" style="max-height: 200px; object-fit: contain;">
-    </div>
-    <div class="col-md-8">
-        <h2>{{ product.name }}</h2>
-        <p class="text-muted"><strong>Действующее вещество:</strong> {{ product.active_substance or '—' }}</p>
-        <p><strong>Форма:</strong> {{ product.form }} | <strong>Дозировка:</strong> {{ product.dosage }}</p>
-        {% if product.prescription_required %}
-        <span class="badge bg-danger mb-2">Требуется рецепт врача</span>
-        {% endif %}
-        <p class="mt-2">{{ product.description }}</p>
+<div class="card shadow-sm border-0 mb-4 p-4 bg-white">
+    <div class="row align-items-center">
+        <div class="col-md-4 text-center">
+            <img src="/static/images/products/{{ product.display_image }}" class="img-fluid rounded p-2" style="max-height: 250px; object-fit: contain;">
+        </div>
+        <div class="col-md-8">
+            <h2 class="fw-bold">{{ product.name }}</h2>
+            <p class="text-muted fs-5">Действующее вещество: <strong>{{ product.active_substance or 'Не указано' }}</strong></p>
+            <p class="fs-6">Форма: <strong>{{ product.form or '-' }}</strong> | Дозировка: <strong>{{ product.dosage or '-' }}</strong></p>
+
+            {% if product.prescription_required %}
+            <span class="badge bg-warning text-dark fs-6 mb-3">⚠️ Требуется рецепт врача</span>
+            {% endif %}
+
+            <p class="text-secondary mt-2">{{ product.description or '' }}</p>
+        </div>
     </div>
 </div>
 
-<h4 class="mb-3">Наличие в аптеках</h4>
+<!-- КАРТА С АПТЕКАМИ -->
+<div class="card shadow-sm border-0 mb-4 bg-white p-3">
+    <h4 class="fw-bold mb-3">📍 Аптеки на карте</h4>
+    <div id="productMap" style="height: 380px;" class="rounded border"></div>
+</div>
 
-<div class="table-responsive bg-white rounded shadow-sm border">
-    <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
-            <tr>
-                <th>Аптека</th>
-                <th>Адрес</th>
-                <th>Время работы</th>
-                <th>Цена</th>
-                <th>Остаток</th>
-                <th>Расстояние</th>
-                <th>Действие</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in pharmacies_info %}
-            <tr>
-                <td class="fw-bold text-primary">{{ item.pharmacy.name }}</td>
-                <td>{{ item.pharmacy.address }}</td>
-                <td><small>{{ item.pharmacy.working_hours }}</small></td>
-                <td class="fw-bold text-success">{{ item.price }} BYN</td>
-                <td><span class="badge bg-success">{{ item.quantity }} шт.</span></td>
-                <td>
-                    {% if item.distance is not none %}
-                    <span class="badge bg-secondary">{{ item.distance }} км</span>
-                    {% else %}
-                    <small class="text-muted">Геолокация выкл.</small>
-                    {% endif %}
-                </td>
-                <td>
-                    <form method="post" action="/cart/add">
-                        <input type="hidden" name="stock_id" value="{{ item.stock_id }}">
-                        <button type="submit" class="btn btn-sm btn-primary">В корзину</button>
+<!-- СОРТИРОВКА И ТАБЛИЦА -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="fw-bold mb-0">Наличие в аптеках</h3>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-primary active fw-bold px-3" id="btnSortPrice" onclick="sortPharmacies('price')">💰 По цене</button>
+        <button type="button" class="btn btn-outline-primary fw-bold px-3" id="btnSortDist" onclick="sortPharmacies('distance')">📍 По расстоянию</button>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 bg-white mb-5">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Аптека</th>
+                    <th>Адрес</th>
+                    <th>Время работы</th>
+                    <th>Цена</th>
+                    <th>Остаток</th>
+                    <th>Расстояние</th>
+                    <th class="text-center">Действие</th>
+                </tr>
+            </thead>
+            <tbody id="pharmaciesTableBody">
+                {% for item in stocks_data %}
+                {% set stock = item.stock %}
+                <tr class="pharmacy-row" 
+                    data-price="{{ stock.price }}" 
+                    data-lat="{{ stock.pharmacy.latitude or 53.90 }}" 
+                    data-lon="{{ stock.pharmacy.longitude or 27.56 }}"
+                    data-name="{{ stock.pharmacy.name }}"
+                    data-address="{{ stock.pharmacy.address }}"
+                    data-avail="{{ item.available }}"
+                    data-stock-id="{{ stock.stock_id }}">
+                    <td><strong class="text-primary">{{ stock.pharmacy.name }}</strong></td>
+                    <td><small class="text-muted">{{ stock.pharmacy.address }}</small></td>
+                    <td><small>{{ stock.pharmacy.working_hours or '08:00-22:00' }}</small></td>
+                    <td class="fw-bold text-success fs-5">{{ stock.price }} BYN</td>
+                    <td>
+                        <span class="badge bg-success px-2 py-1 fs-6">{{ item.available }} шт.</span>
+                    </td>
+                    <td class="distance-cell text-muted"><small>Расчёт...</small></td>
+                    <td class="text-center">
+                        <form method="post" action="/cart/add">
+                            <input type="hidden" name="stock_id" value="{{ stock.stock_id }}">
+                            <input type="hidden" name="quantity" value="1">
+                            <button type="submit" class="btn btn-primary btn-sm px-3 fw-bold">В корзину</button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">К сожалению, данного препарата сейчас нет в наличии ни в одной аптеке.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let map;
+let userLat = parseFloat("{{ user_lat }}") || 53.9045;
+let userLon = parseFloat("{{ user_lon }}") || 27.5615;
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+function initMapAndDistances(currentLat, currentLon) {
+    const rows = document.querySelectorAll('.pharmacy-row');
+
+    if (map) {
+        map.remove();
+    }
+    map = L.map('productMap').setView([currentLat, currentLon], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    const userIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    L.marker([currentLat, currentLon], { icon: userIcon })
+        .addTo(map)
+        .bindPopup("<b>Вы здесь</b> (Ваше местоположение)");
+
+    const bounds = [[currentLat, currentLon]];
+
+    const pharmIcon = L.icon({
+        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowSize: [41, 41]
+    });
+
+    rows.forEach(row => {
+        const pLat = parseFloat(row.getAttribute('data-lat'));
+        const pLon = parseFloat(row.getAttribute('data-lon'));
+        const pName = row.getAttribute('data-name');
+        const pAddr = row.getAttribute('data-address');
+        const pPrice = row.getAttribute('data-price');
+        const pAvail = row.getAttribute('data-avail');
+        const stockId = row.getAttribute('data-stock-id');
+        const cell = row.querySelector('.distance-cell');
+
+        if (!isNaN(pLat) && !isNaN(pLon)) {
+            const dist = calculateDistance(currentLat, currentLon, pLat, pLon);
+            row.setAttribute('data-distance', dist.toFixed(3));
+            cell.innerHTML = `<span class="fw-bold text-dark">${dist.toFixed(1)} км</span>`;
+
+            bounds.push([pLat, pLon]);
+
+            const popupContent = `
+                <div style="font-family: sans-serif; min-width: 160px;">
+                    <h6 style="margin:0 0 4px 0; color:#0d6efd; font-weight:bold;">${pName}</h6>
+                    <p style="margin:0 0 6px 0; font-size:12px; color:#6c757d;">${pAddr}</p>
+                    <div style="font-weight:bold; color:#198754; margin-bottom:8px;">${pPrice} BYN <small>(${pAvail} шт.)</small></div>
+                    <form method="post" action="/cart/add" style="margin:0;">
+                        <input type="hidden" name="stock_id" value="${stockId}">
+                        <input type="hidden" name="quantity" value="1">
+                        <button type="submit" style="background:#0d6efd; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold; width:100%;">В корзину</button>
                     </form>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td colspan="7" class="text-center py-4 text-muted">
-                    К сожалению, данного препарата сейчас нет в наличии ни в одной аптеке.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                </div>
+            `;
+
+            L.marker([pLat, pLon], { icon: pharmIcon })
+                .addTo(map)
+                .bindPopup(popupContent);
+        } else {
+            row.setAttribute('data-distance', '999999');
+            cell.innerText = '—';
+        }
+    });
+
+    if (bounds.length > 1) {
+        map.fitBounds(bounds, { padding: [40, 40] });
+    }
+}
+
+function sortPharmacies(criterion) {
+    const tbody = document.getElementById('pharmaciesTableBody');
+    const rows = Array.from(tbody.querySelectorAll('.pharmacy-row'));
+    const btnPrice = document.getElementById('btnSortPrice');
+    const btnDist = document.getElementById('btnSortDist');
+
+    if (criterion === 'price') {
+        rows.sort((a, b) => parseFloat(a.getAttribute('data-price')) - parseFloat(b.getAttribute('data-price')));
+        btnPrice.classList.add('active');
+        btnDist.classList.remove('active');
+    } else if (criterion === 'distance') {
+        rows.sort((a, b) => parseFloat(a.getAttribute('data-distance')) - parseFloat(b.getAttribute('data-distance')));
+        btnDist.classList.add('active');
+        btnPrice.classList.remove('active');
+    }
+
+    rows.forEach(row => tbody.appendChild(row));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                // 1. Живой GPS браузера
+                initMapAndDistances(pos.coords.latitude, pos.coords.longitude);
+            },
+            (err) => {
+                // 2. Координаты профиля из БД (или дефолт Минска)
+                initMapAndDistances(userLat, userLon);
+            },
+            { timeout: 4000 }
+        );
+    } else {
+        initMapAndDistances(userLat, userLon);
+    }
+});
+</script>
 {% endblock %}
