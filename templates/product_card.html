@@ -1,0 +1,66 @@
+{% extends "shared/_layout.html" %}
+
+{% block content %}
+<div class="row bg-white p-4 rounded shadow-sm border mb-4">
+    <div class="col-md-4 text-center">
+        <img src="/static/images/products/{{ product.display_image }}" class="card-img-top p-3" style="max-height: 200px; object-fit: contain;">
+    </div>
+    <div class="col-md-8">
+        <h2>{{ product.name }}</h2>
+        <p class="text-muted"><strong>Действующее вещество:</strong> {{ product.active_substance or '—' }}</p>
+        <p><strong>Форма:</strong> {{ product.form }} | <strong>Дозировка:</strong> {{ product.dosage }}</p>
+        {% if product.prescription_required %}
+        <span class="badge bg-danger mb-2">Требуется рецепт врача</span>
+        {% endif %}
+        <p class="mt-2">{{ product.description }}</p>
+    </div>
+</div>
+
+<h4 class="mb-3">Наличие в аптеках</h4>
+
+<div class="table-responsive bg-white rounded shadow-sm border">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th>Аптека</th>
+                <th>Адрес</th>
+                <th>Время работы</th>
+                <th>Цена</th>
+                <th>Остаток</th>
+                <th>Расстояние</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in pharmacies_info %}
+            <tr>
+                <td class="fw-bold text-primary">{{ item.pharmacy.name }}</td>
+                <td>{{ item.pharmacy.address }}</td>
+                <td><small>{{ item.pharmacy.working_hours }}</small></td>
+                <td class="fw-bold text-success">{{ item.price }} BYN</td>
+                <td><span class="badge bg-success">{{ item.quantity }} шт.</span></td>
+                <td>
+                    {% if item.distance is not none %}
+                    <span class="badge bg-secondary">{{ item.distance }} км</span>
+                    {% else %}
+                    <small class="text-muted">Геолокация выкл.</small>
+                    {% endif %}
+                </td>
+                <td>
+                    <form method="post" action="/cart/add">
+                        <input type="hidden" name="stock_id" value="{{ item.stock_id }}">
+                        <button type="submit" class="btn btn-sm btn-primary">В корзину</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    К сожалению, данного препарата сейчас нет в наличии ни в одной аптеке.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

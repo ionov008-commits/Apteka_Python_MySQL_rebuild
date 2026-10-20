@@ -1,0 +1,84 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<h2 class="mb-4">Ваша корзина</h2>
+
+{% if items %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body p-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Товар</th>
+                            <th>Аптека</th>
+                            <th>Цена</th>
+                            <th class="text-center" style="width: 160px;">Количество</th>
+                            <th>Сумма</th>
+                            <th>Удалить</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>
+                                <strong>{{ item.stock.product.name }}</strong><br>
+                                <small class="text-muted">{{ item.stock.product.form }} ({{ item.stock.product.dosage or '' }})</small>
+                            </td>
+                            <td><small class="fw-bold text-primary">{{ item.stock.pharmacy.name }}</small></td>
+                            <td>{{ item.stock.price }} BYN</td>
+                            <td class="text-center">
+                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                    <form method="post" action="/cart/update" class="d-inline">
+                                        <input type="hidden" name="order_item_id" value="{{ item.order_item_id }}">
+                                        <input type="hidden" name="action" value="decrease">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary px-2 fw-bold">-</button>
+                                    </form>
+
+                                    <span class="badge bg-light text-dark border px-3 py-2 fs-6">{{ item.quantity }}</span>
+
+                                    <form method="post" action="/cart/update" class="d-inline">
+                                        <input type="hidden" name="order_item_id" value="{{ item.order_item_id }}">
+                                        <input type="hidden" name="action" value="increase">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary px-2 fw-bold" {% if item.quantity >= item.stock.quantity %}disabled{% endif %}>+</button>
+                                    </form>
+                                </div>
+                            </td>
+                            <td class="fw-bold text-success">{{ "%.2f"|format(item.quantity * item.stock.price) }} BYN</td>
+                            <td>
+                                <form method="post" action="/cart/update" class="d-inline" onsubmit="return confirm('Удалить товар из корзины?');">
+                                    <input type="hidden" name="order_item_id" value="{{ item.order_item_id }}">
+                                    <input type="hidden" name="action" value="remove">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0">🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 p-4">
+            <h4 class="mb-3">Итого к оплате</h4>
+            <div class="d-flex justify-content-between fs-4 fw-bold text-primary mb-4">
+                <span>Сумма:</span>
+                <span>{{ "%.2f"|format(total_cost) }} BYN</span>
+            </div>
+            <form method="post" action="/cart/checkout">
+                <button type="submit" class="btn btn-success btn-lg w-100 py-3 fw-bold">Подтвердить бронирование</button>
+            </form>
+            <small class="text-muted d-block text-center mt-3">Бронь сохраняется 7 дней</small>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="alert alert-info text-center py-5">
+    <h4>Ваша корзина пуста</h4>
+    <p class="mb-3">Перейдите в каталог, чтобы выбрать необходимые товары.</p>
+    <a href="/catalog" class="btn btn-primary">Перейти в каталог</a>
+</div>
+{% endif %}
+{% endblock %}

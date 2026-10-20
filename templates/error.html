@@ -1,0 +1,8 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-1 text-danger">Ошибка</h1>
+    <p class="fs-4 text-muted">{{ message or "Произошла непредвиденная ошибка." }}</p>
+    <a href="/catalog" class="btn btn-primary btn-lg mt-3">Вернуться в каталог</a>
+</div>
+{% endblock %}

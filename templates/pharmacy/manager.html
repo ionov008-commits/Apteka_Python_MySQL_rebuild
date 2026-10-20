@@ -1,0 +1,102 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Аптека: <span class="text-primary">{{ pharmacy.name }}</span></h2>
+        <span class="badge bg-secondary fs-6">{{ pharmacy.address }}</span>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary text-white p-3 shadow-sm border-0">
+                <div class="small opacity-75">Всего упаковок на складе</div>
+                <div class="fs-2 fw-bold">{{ total_items }} шт.</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white p-3 shadow-sm border-0">
+                <div class="small opacity-75">Общая стоимость склада</div>
+                <div class="fs-2 fw-bold">{{ "%.2f"|format(total_value) }} BYN</div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark p-3 shadow-sm border-0">
+                <div class="small opacity-75">Позиций с активной бронью</div>
+                <div class="fs-2 fw-bold">
+                    {% set count = [] %}
+                    {% for item in stocks_info if item.reserved > 0 %}{% set _ = count.append(1) %}{% endfor %}
+                    {{ count|length }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 p-4 bg-white">
+        <h4 class="mb-3">Управление остатками и ценами</h4>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Препарат</th>
+                        <th>Форма / Дозировка</th>
+                        <th class="text-center" style="width: 120px;">В наличии</th>
+                        <th class="text-center" style="width: 100px;">Забронировано</th>
+                        <th class="text-center" style="width: 140px;">Цена (BYN)</th>
+                        <th class="text-center" style="width: 120px;">Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in stocks_info %}
+                    <tr>
+                        <form method="post" action="/pharmacy/manager/stock/update">
+                            <input type="hidden" name="stock_id" value="{{ item.stock.stock_id }}">
+                            <td><strong>{{ item.stock.product.name }}</strong></td>
+                            <td><small class="text-muted">{{ item.stock.product.form }} {{ item.stock.product.dosage or '' }}</small></td>
+                            <td>
+                                <input type="number" name="quantity" class="form-control form-control-sm text-center" value="{{ item.stock.quantity }}" min="0">
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if item.reserved > 0 %}bg-warning text-dark{% else %}bg-light text-muted border{% endif %} fs-6">
+                                    {{ item.reserved }}
+                                </span>
+                            </td>
+                            <td>
+                                <input type="number" step="0.01" name="price" class="form-control form-control-sm text-end" value="{{ item.stock.price }}" min="0.01">
+                            </td>
+                            <td class="text-center">
+                                <button type="submit" class="btn btn-sm btn-primary px-3 fw-bold">Сохранить</button>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+
+                    <tr class="table-info">
+                        <form method="post" action="/pharmacy/manager/stock/add">
+                            <td>
+                                <select name="product_id" class="form-select form-select-sm" required>
+                                    <option value="">-- Выберите препарат из каталога --</option>
+                                    {% for p in available_products %}
+                                    <option value="{{ p.product_id }}">{{ p.name }} ({{ p.form }} {{ p.dosage or '' }})</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td><small class="text-muted">Новая позиция</small></td>
+                            <td>
+                                <input type="number" name="quantity" class="form-control form-control-sm text-center" value="10" min="1" required>
+                            </td>
+                            <td class="text-center text-muted">-</td>
+                            <td>
+                                <input type="number" step="0.01" name="price" class="form-control form-control-sm text-end" value="10.00" min="0.01" required>
+                            </td>
+                            <td class="text-center">
+                                <button type="submit" class="btn btn-sm btn-success px-3 fw-bold">+ Добавить</button>
+                            </td>
+                        </form>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,11 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<div class="text-center py-5">
+    <div class="card p-5 shadow-sm border-0 d-inline-block" style="max-width: 500px;">
+        <div class="text-success display-1 mb-3">✓</div>
+        <h2>Регистрация завершена!</h2>
+        <p class="text-muted mt-2">Теперь вы можете войти в аккаунт, используя указанные логин и пароль.</p>
+        <a href="/account/login" class="btn btn-primary btn-lg mt-3 w-100">Войти в аккаунт</a>
+    </div>
+</div>
+{% endblock %}

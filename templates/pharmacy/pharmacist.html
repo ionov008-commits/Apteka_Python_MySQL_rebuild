@@ -1,0 +1,201 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Рабочее место фармацевта</h2>
+        <span class="badge bg-primary fs-6">{{ pharmacist.pharmacy.name if pharmacist and pharmacist.pharmacy else 'Аптека' }}</span>
+    </div>
+    <p class="text-muted">Сотрудник: <strong>{{ pharmacist.full_name if pharmacist else 'Фармацевт' }}</strong></p>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 p-4 bg-white">
+                <h5 class="card-title mb-3">Поиск заказа</h5>
+
+                <form method="get" action="/pharmacy/pharmacist" id="searchForm">
+                    <div class="input-group mb-3">
+                        <input type="number" class="form-control form-control-lg" name="order_id" id="SearchOrderId" placeholder="Введите ID заказа..." value="{{ search_id }}" required>
+                        <button class="btn btn-primary btn-lg" type="submit">Найти</button>
+                    </div>
+                </form>
+
+                <div class="border rounded p-4 text-center bg-light" id="qrDropZone" style="cursor: pointer; border-style: dashed !important; border-width: 2px !important;">
+                    <h4 class="mb-2">📷 Загрузить QR-код</h4>
+                    <p class="text-muted small mb-0">Нажмите сюда, чтобы выбрать картинку с QR-кодом</p>
+                    <p class="text-muted small mb-2">или просто нажмите <strong>Ctrl+V</strong> на клавиатуре</p>
+
+                    <input type="file" id="qrFileInput" accept="image/*" style="display: none;" />
+                    <div id="qr-error" class="text-danger small mt-2" style="display: none;">
+                        Не удалось распознать QR-код или найти в нём ID заказа.
+                    </div>
+                </div>
+
+                <div id="reader" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    {% if order %}
+    <div class="card shadow-sm border-primary p-4 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4>Заказ #{{ order.order_id }}</h4>
+            <span class="badge fs-6 {% if order.status == 'active' %}bg-primary{% elif order.status == 'выдан' %}bg-success{% else %}bg-secondary{% endif %}">
+                {{ order.status }}
+            </span>
+        </div>
+        <p><strong>Покупатель:</strong> {{ order.customer.full_name if order.customer else 'Гость' }} ({{ order.customer.phone if order.customer else '' }})</p>
+        <p><strong>Общая сумма заказа:</strong> {{ order.total_cost }} BYN</p>
+
+        <h5 class="mt-4 mb-3">Состав заказа для вашей аптеки:</h5>
+
+        <form method="post" action="/pharmacy/pharmacist/dispense">
+            <input type="hidden" name="order_id" value="{{ order.order_id }}">
+
+            <table class="table table-hover align-middle my-3" id="orderItemsTable">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-danger" style="width: 100px;">Отказ ❌</th>
+                        <th>Препарат</th>
+                        <th>Форма / Дозировка</th>
+                        <th>Кол-во</th>
+                        <th>Цена</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in order_items %}
+                    <tr>
+                        <td>
+                            {% if item.status == 'Pending' %}
+                            <input class="form-check-input item-check border-danger" type="checkbox" name="cancelled_item_ids" value="{{ item.order_item_id }}" style="transform: scale(1.5);">
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="item-name fw-bold">{{ item.stock.product.name }}</td>
+                        <td class="item-name"><small class="text-muted">{{ item.stock.product.form }}, {{ item.stock.product.dosage or '' }}</small></td>
+                        <td class="item-name"><strong>{{ item.quantity }} шт.</strong></td>
+                        <td class="item-name">{{ item.stock.price }} BYN</td>
+                        <td>
+                            {% if item.status == 'Pending' %}
+                            <span class="badge bg-warning text-dark">В ожидании</span>
+                            {% elif item.status == 'Dispensed' %}
+                            <span class="badge bg-success">Выдано</span>
+                            {% elif item.status == 'Cancelled' %}
+                            <span class="badge bg-danger">Отказ</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">В этом заказе нет товаров из вашей аптеки.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            {% if order_items and order_items|selectattr("status", "equalto", "Pending")|list|length > 0 %}
+            <button type="submit" class="btn btn-success btn-lg w-100 py-3 fw-bold mt-3">
+                ✅ Подтвердить выдачу
+            </button>
+            <small class="text-muted d-block text-center mt-2">Будут выданы все позиции, кроме отмеченных галочкой "Отказ".</small>
+            {% else %}
+            <div class="alert alert-secondary text-center mb-0 mt-3">Товары вашей аптеки по этому заказу уже обработаны.</div>
+            {% endif %}
+        </form>
+    </div>
+    {% elif search_id %}
+    <div class="alert alert-warning text-center">Заказ с ID #{{ search_id }} не найден.</div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const checkboxes = document.querySelectorAll('.item-check');
+    checkboxes.forEach(chk => {
+        chk.addEventListener('change', function () {
+            const row = this.closest('tr');
+            const textCells = row.querySelectorAll('.item-name');
+            if (this.checked) {
+                textCells.forEach(cell => {
+                    cell.style.textDecoration = 'line-through';
+                    cell.style.color = '#dc3545';
+                });
+            } else {
+                textCells.forEach(cell => {
+                    cell.style.textDecoration = 'none';
+                    cell.style.color = '';
+                });
+            }
+        });
+    });
+
+    const qrDropZone = document.getElementById('qrDropZone');
+    const qrFileInput = document.getElementById('qrFileInput');
+    const qrError = document.getElementById('qr-error');
+    const searchInput = document.getElementById('SearchOrderId');
+    const searchForm = document.getElementById('searchForm');
+
+    if (qrDropZone) {
+        const html5QrCode = new Html5Qrcode("reader");
+
+        function extractOrderId(text) {
+            let match = text.match(/order_id=(\d+)/i) || text.match(/SearchOrderId=(\d+)/i);
+            if (match) return match[1];
+            match = text.match(/\/(\d+)$/);
+            if (match) return match[1];
+            match = text.match(/\d+/);
+            if (match) return match[0];
+            return null;
+        }
+
+        function processImageFile(file) {
+            if (!file) return;
+            qrError.style.display = 'none';
+            qrDropZone.style.opacity = '0.5';
+
+            html5QrCode.scanFile(file, true)
+                .then(decodedText => {
+                    const orderId = extractOrderId(decodedText);
+                    if (orderId) {
+                        searchInput.value = orderId;
+                        searchForm.submit();
+                    } else {
+                        throw new Error("В коде нет ID заказа");
+                    }
+                })
+                .catch(err => {
+                    console.error("Ошибка сканирования QR:", err);
+                    qrError.style.display = 'block';
+                    qrDropZone.style.opacity = '1';
+                    qrFileInput.value = "";
+                });
+        }
+
+        qrDropZone.addEventListener('click', () => qrFileInput.click());
+
+        qrFileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                processImageFile(e.target.files[0]);
+            }
+        });
+
+        window.addEventListener('paste', e => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.type.indexOf('image') === 0) {
+                    const file = item.getAsFile();
+                    if (file) processImageFile(file);
+                    break;
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

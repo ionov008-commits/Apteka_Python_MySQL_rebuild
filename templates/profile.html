@@ -1,0 +1,83 @@
+{% extends "shared/_layout.html" %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0 p-4 bg-white">
+            <h3>Личный кабинет</h3>
+            <p class="text-muted mb-0"><strong>ФИО:</strong> {{ customer.full_name }} | <strong>Телефон:</strong> {{ customer.phone }}</p>
+        </div>
+    </div>
+</div>
+
+<h4 class="mb-3">Активные бронирования</h4>
+<div class="row row-cols-1 row-cols-md-2 g-4 mb-5">
+    {% for order in active_orders %}
+    <div class="col">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <span>Заказ #{{ order.order_id }}</span>
+                <span class="badge bg-light text-dark">{{ order.status }}</span>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><small class="text-muted">Создан: {{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '' }}</small></p>
+                <p class="mb-2"><small class="text-danger">Годен до: {{ order.expires_at.strftime('%Y-%m-%d %H:%M') if order.expires_at else '' }}</small></p>
+
+                <ul class="list-group list-group-flush my-3">
+                    {% for item in order.items %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <small class="fw-bold">{{ item.stock.product.name }}</small><br>
+                            <small class="text-muted">{{ item.stock.pharmacy.name }} ({{ item.stock.pharmacy.address }})</small>
+                        </div>
+                        <span class="badge bg-secondary">{{ item.quantity }} шт.</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                    <span class="fw-bold text-success fs-5">{{ order.total_cost }} BYN</span>
+                    <div class="text-center">
+                        <img src="/static/images/orders/{{ order.order_id }}.png" style="width: 80px; height: 80px;" alt="QR Code">
+                        <small class="d-block text-muted">Покажите в аптеке</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12"><div class="alert alert-light text-center">У вас нет активных броней.</div></div>
+    {% endfor %}
+</div>
+
+<h4 class="mb-3">История заказов</h4>
+<div class="table-responsive bg-white rounded shadow-sm border">
+    <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+            <tr>
+                <th># Заказа</th>
+                <th>Дата</th>
+                <th>Статус</th>
+                <th>Сумма</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in past_orders %}
+            <tr>
+                <td>#{{ order.order_id }}</td>
+                <td>{{ order.created_at.strftime('%Y-%m-%d %H:%M') if order.created_at else '' }}</td>
+                <td>
+                    {% if order.status == 'выдан' %}
+                    <span class="badge bg-success">Выдан</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Отменен</span>
+                    {% endif %}
+                </td>
+                <td class="fw-bold">{{ order.total_cost }} BYN</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-3">История пуста</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
