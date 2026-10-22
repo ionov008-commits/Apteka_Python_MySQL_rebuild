@@ -10,10 +10,9 @@
 </head>
 <body class="d-flex flex-column min-vh-100 bg-light">
 
-    <!-- Шапка сайта -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
         <div class="container">
-            <a class="navbar-brand fw-bold" href="/">💊 Агрегатор Аптек</a>
+            <a class="navbar-brand fw-bold" href="/">Агрегатор Аптек</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -32,7 +31,7 @@
                         {% elif role == 'pharmacist' %}
                             <li class="nav-item"><a class="nav-link" href="/pharmacy/pharmacist">💊 Рабочее место</a></li>
                         {% elif role == 'admin' %}
-                            <li class="nav-item"><a class="nav-link" href="/admin/dashboard">⚙️ Админка</a></li>
+                            <li class="nav-item"><a class="nav-link" href="/admin/dashboard">⚙️ Дашборд</a></li>
                         {% else %}
                             {# Покупатель #}
                             <li class="nav-item"><a class="nav-link" href="/cart">🛒 Корзина</a></li>

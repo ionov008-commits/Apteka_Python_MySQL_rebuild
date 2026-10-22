@@ -1,85 +1,109 @@
-import os
-from typing import Optional
-from fastapi import APIRouter, Depends, Request, Form, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import Optional
+import os
+import shutil
 
 from app.db.database import get_db
 from app.db import models
 
-router = APIRouter(prefix="/admin", tags=["Admin"])
-templates = Jinja2Templates(directory="templates")
+router = APIRouter(prefix='/admin', tags=['Admin'])
+templates = Jinja2Templates(directory='templates')
 
+def check_admin_access(request: Request):
+    role = request.cookies.get('user_role')
+    return role == 'admin'
 
-@router.get("/dashboard")
-def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    user_id = request.cookies.get("user_id")
-    user_role = request.cookies.get("user_role")
-    if not user_id or user_role != "admin":
-        return RedirectResponse(url="/account/login", status_code=303)
+@router.get('/dashboard')
+def admin_dashboard(request: Request, error: Optional[str] = None, success: Optional[str] = None, db: Session = Depends(get_db)):
+    if not check_admin_access(request):
+        return RedirectResponse(url='/account/login', status_code=303)
 
-    users = db.query(models.User).all()
-    pharmacies = db.query(models.Pharmacy).all()
     products = db.query(models.Product).order_by(models.Product.product_id.desc()).all()
+    pharmacies = db.query(models.Pharmacy).all()
+    users_count = db.query(models.User).count()
 
     return templates.TemplateResponse(
-        request=request,
-        name="admin/dashboard.html",
+        request=request, name='admin/dashboard.html',
         context={
-            "users": users,
-            "pharmacies": pharmacies,
-            "products": products,
-            "title": "Панель администратора"
+            'products': products,
+            'pharmacies': pharmacies,
+            'users_count': users_count,
+            'error': error,
+            'success': success,
+            'title': 'Панель администратора'
         }
     )
 
-
-@router.post("/product/add")
+@router.post('/products/add')
 async def add_product(
+    request: Request,
     name: str = Form(...),
     active_substance: Optional[str] = Form(None),
     form: str = Form(...),
     dosage: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
-    prescription_required: bool = Form(False),
-    image_file: Optional[UploadFile] = File(None),
+    prescription_required: Optional[bool] = Form(False),
+    image_file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
-    product = models.Product(
-        name=name,
-        active_substance=active_substance,
-        form=form,
-        dosage=dosage,
-        description=description,
-        prescription_required=1 if prescription_required else 0
+    if not check_admin_access(request):
+        return RedirectResponse(url='/account/login', status_code=303)
+
+    # 1. Валидация обязательных полей
+    if not name.strip() or not form.strip() or not dosage.strip():
+        return RedirectResponse(
+            url='/admin/dashboard?error=Заполните+все+обязательные+поля+(Название,+Форма,+Дозировка)',
+            status_code=303
+        )
+
+    if not image_file or not image_file.filename:
+        return RedirectResponse(
+            url='/admin/dashboard?error=Загрузка+изображения+препарата+обязательна',
+            status_code=303
+        )
+
+    # 2. Проверка на дубликат (Название + Форма + Дозировка)
+    existing_product = db.query(models.Product).filter(
+        func.lower(models.Product.name) == name.strip().lower(),
+        func.lower(models.Product.form) == form.strip().lower(),
+        func.lower(models.Product.dosage) == dosage.strip().lower()
+    ).first()
+
+    if existing_product:
+        return RedirectResponse(
+            url=f'/admin/dashboard?error=Препарат+"{name.strip()}"+({form.strip()},+{dosage.strip()})+уже+есть+в+базе+(ID:+{existing_product.product_id})',
+            status_code=303
+        )
+
+    # 3. Добавление записи в БД для генерации product_id
+    new_product = models.Product(
+        name=name.strip(),
+        active_substance=active_substance.strip() if active_substance else None,
+        form=form.strip(),
+        dosage=dosage.strip() if dosage else None,
+        description=description.strip() if description else None,
+        prescription_required=bool(prescription_required),
+        image=None  # Свойство display_image автоматически возьмет product_id.png
     )
-    db.add(product)
+
+    db.add(new_product)
     db.commit()
-    db.refresh(product)
+    db.refresh(new_product)
 
-    # Если загружен файл изображения
-    if image_file and image_file.filename:
-        folder = os.path.join("static", "images", "products")
-        os.makedirs(folder, exist_ok=True)
-        ext = os.path.splitext(image_file.filename)[1] or ".png"
-        filename = f"{product.product_id}{ext}"
-        file_path = os.path.join(folder, filename)
+    # 4. Сохранение картинки под именем {product_id}.png
+    upload_dir = os.path.join('static', 'images', 'products')
+    os.makedirs(upload_dir, exist_ok=True)
 
-        content = await image_file.read()
-        with open(file_path, "wb") as f:
-            f.write(content)
+    file_path = os.path.join(upload_dir, f"{new_product.product_id}.png")
 
-        product.image = filename
-        db.commit()
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image_file.file, buffer)
 
-    return RedirectResponse(url="/admin/dashboard", status_code=303)
-
-
-@router.post("/user/delete/{user_id_to_delete}")
-def delete_user(user_id_to_delete: int, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.user_id == user_id_to_delete).first()
-    if user and user.role != "admin":
-        db.delete(user)
-        db.commit()
-    return RedirectResponse(url="/admin/dashboard", status_code=303)
+    return RedirectResponse(
+        url=f'/admin/dashboard?success=Препарат+"{new_product.name}"+успешно+добавлен+(ID:+{new_product.product_id})',
+        status_code=303
+    )

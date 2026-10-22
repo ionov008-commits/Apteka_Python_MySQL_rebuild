@@ -19,7 +19,26 @@ def get_reserved_quantity(stock_id: int, db: Session) -> int:
 
 @router.get('/')
 def home_page(request: Request, db: Session = Depends(get_db)):
-    popular_products = db.query(models.Product).limit(6).all()
+    popular_products = (
+        db.query(models.Product)
+        .join(models.PharmacyStock, models.Product.product_id == models.PharmacyStock.product_id)
+        .join(models.OrderItem, models.PharmacyStock.stock_id == models.OrderItem.stock_id)
+        .group_by(models.Product.product_id)
+        .order_by(func.sum(models.OrderItem.quantity).desc())
+        .limit(6)
+        .all()
+    )
+
+    if len(popular_products) < 6:
+        existing_ids = [p.product_id for p in popular_products]
+        additional_products = (
+            db.query(models.Product)
+            .filter(models.Product.product_id.not_in(existing_ids) if existing_ids else True)
+            .limit(6 - len(popular_products))
+            .all()
+        )
+        popular_products.extend(additional_products)
+
     pharmacies_count = db.query(models.Pharmacy).count()
     products_count = db.query(models.Product).count()
 
@@ -33,6 +52,27 @@ def home_page(request: Request, db: Session = Depends(get_db)):
             'title': 'Главная — Поиск лекарств в аптеках'
         }
     )
+
+@router.get('/api/search_suggest')
+def search_suggest(q: Optional[str] = Query(None), db: Session = Depends(get_db)):
+    if not q or len(q.strip()) < 1:
+        return []
+
+    products = db.query(models.Product).filter(
+        (models.Product.name.ilike(f'%{q.strip()}%')) |
+        (models.Product.active_substance.ilike(f'%{q.strip()}%'))
+    ).limit(6).all()
+
+    return [
+        {
+            "product_id": p.product_id,
+            "name": p.name,
+            "form": p.form or "",
+            "dosage": p.dosage or "",
+            "image": p.display_image
+        }
+        for p in products
+    ]
 
 @router.get('/catalog')
 def catalog_page(

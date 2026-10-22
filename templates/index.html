@@ -1,25 +1,17 @@
 {% extends "shared/_layout.html" %}
 {% block content %}
-<!-- Главный баннер с быстрым поиском -->
+<!-- Главный баннер с живым поиском -->
 <div class="p-5 mb-4 bg-primary text-white rounded-3 shadow-sm">
     <div class="container-fluid py-4 text-center">
         <h1 class="display-5 fw-bold mb-3">Единый поиск лекарств в аптеках</h1>
         <p class="col-md-8 fs-5 mx-auto mb-4">Сравнивайте цены, проверяйте наличие в ближайших аптеках и бронируйте препараты в пару кликов.</p>
 
-        <form method="get" action="/catalog" class="col-md-8 mx-auto">
-            <div class="input-group input-group-lg shadow">
-                <input type="text" name="q" class="form-control" placeholder="Введите название лекарства или действующее вещество..." aria-label="Поиск">
-                <button class="btn btn-warning fw-bold px-4 text-dark" type="submit">Найти в аптеках</button>
-            </div>
-        </form>
+        <!-- Поисковая строка без кнопок и форм -->
+        <div class="col-md-8 mx-auto position-relative">
+            <input type="text" id="searchInput" class="form-control form-control-lg shadow border-0 py-3 px-4 fs-5 rounded-3" placeholder="Введите название лекарства..." autocomplete="off">
 
-        <!-- Быстрые теги фильтрации -->
-        <div class="mt-3 d-flex justify-content-center gap-2 flex-wrap">
-            <span class="small opacity-75 me-2">Часто ищут:</span>
-            <a href="/catalog?q=Парацетамол" class="badge bg-white text-primary text-decoration-none">Парацетамол</a>
-            <a href="/catalog?q=Амоксициллин" class="badge bg-white text-primary text-decoration-none">Амоксициллин</a>
-            <a href="/catalog?q=Ибупрофен" class="badge bg-white text-primary text-decoration-none">Ибупрофен</a>
-            <a href="/catalog?form=таблетки" class="badge bg-white text-primary text-decoration-none">Таблетки</a>
+            <!-- Выпадающее меню подсказок -->
+            <div id="suggestionsBox" class="list-group position-absolute w-100 shadow-lg rounded-3 mt-1 overflow-hidden d-none" style="z-index: 1050; top: 100%; left: 0;"></div>
         </div>
     </div>
 </div>
@@ -28,21 +20,47 @@
 <div class="row g-4 mb-5 text-center">
     <div class="col-md-4">
         <div class="card h-100 border-0 shadow-sm p-4">
-            <div class="fs-1 text-primary mb-2">📍</div>
+            <div class="d-inline-flex align-items-center justify-content-center bg-primary-subtle text-primary rounded-circle mb-3 mx-auto" style="width: 64px; height: 64px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+            </div>
             <h5 class="fw-bold">Геолокация и карты</h5>
             <p class="text-muted small mb-0">Система автоматически находит ближайшие к вам аптеки и рассчитывает расстояние в километрах.</p>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card h-100 border-0 shadow-sm p-4">
-            <div class="fs-1 text-success mb-2">📲</div>
+            <div class="d-inline-flex align-items-center justify-content-center bg-success-subtle text-success rounded-circle mb-3 mx-auto" style="width: 64px; height: 64px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect width="5" height="5" x="3" y="3" rx="1"/>
+                    <rect width="5" height="5" x="16" y="3" rx="1"/>
+                    <rect width="5" height="5" x="3" y="16" rx="1"/>
+                    <path d="M21 16h-3a2 2 0 0 0-2 2v3"/>
+                    <path d="M21 21v.01"/>
+                    <path d="M12 7v3a2 2 0 0 1-2 2H7"/>
+                    <path d="M3 12h.01"/>
+                    <path d="M12 3h.01"/>
+                    <path d="M12 16v.01"/>
+                    <path d="M16 12h1"/>
+                    <path d="M21 12v.01"/>
+                    <path d="M12 21v-1"/>
+                </svg>
+            </div>
             <h5 class="fw-bold">Бронь по QR-коду</h5>
             <p class="text-muted small mb-0">Оформите заказ онлайн и покажите QR-код фармацевту в аптеке для мгновенного получения.</p>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card h-100 border-0 shadow-sm p-4">
-            <div class="fs-1 text-warning mb-2">⚖️</div>
+            <div class="d-inline-flex align-items-center justify-content-center bg-warning-subtle text-warning rounded-circle mb-3 mx-auto" style="width: 64px; height: 64px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m15 5 4 4"/>
+                    <path d="M13 2 3 12v7a2 2 0 0 0 2 2h7l10-10V4z"/>
+                    <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>
+                </svg>
+            </div>
             <h5 class="fw-bold">Прозрачность цен</h5>
             <p class="text-muted small mb-0">Сравнивайте стоимость препаратов в разных аптечных сетях города без переплат.</p>
         </div>
@@ -88,4 +106,75 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('searchInput');
+    const suggestionsBox = document.getElementById('suggestionsBox');
+    let debounceTimer;
+
+    function hideSuggestions() {
+        suggestionsBox.classList.add('d-none');
+        suggestionsBox.innerHTML = '';
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            clearTimeout(debounceTimer);
+            const query = this.value.trim();
+
+            if (!query) {
+                hideSuggestions();
+                return;
+            }
+
+            debounceTimer = setTimeout(() => {
+                fetch(`/api/search_suggest?q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.length === 0) {
+                            suggestionsBox.innerHTML = `
+                                <div class="list-group-item p-3 text-muted text-center bg-white">
+                                    Препараты не найдены
+                                </div>`;
+                        } else {
+                            suggestionsBox.innerHTML = data.map(item => `
+                                <div class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-3 text-start border-bottom bg-white" 
+                                     style="cursor: pointer;"
+                                     onmousedown="window.location.href='/product/${item.product_id}'">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <img src="/static/images/products/${item.image}" style="width: 42px; height: 42px; object-fit: contain;" class="rounded border p-1 bg-white">
+                                        <div>
+                                            <div class="fw-bold text-dark mb-0">${item.name}</div>
+                                            <small class="text-muted">${item.form} ${item.dosage}</small>
+                                        </div>
+                                    </div>
+                                    <span class="btn btn-sm btn-outline-primary fw-bold px-3">Перейти &rarr;</span>
+                                </div>
+                            `).join('');
+                        }
+                        suggestionsBox.classList.remove('d-none');
+                    })
+                    .catch(err => console.error("Ошибка запроса подсказок:", err));
+            }, 150);
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const firstItem = suggestionsBox.querySelector('.list-group-item-action');
+                if (firstItem) {
+                    firstItem.dispatchEvent(new Event('mousedown'));
+                }
+            }
+        });
+    }
+
+    document.addEventListener('click', function (e) {
+        if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+            hideSuggestions();
+        }
+    });
+});
+</script>
 {% endblock %}
